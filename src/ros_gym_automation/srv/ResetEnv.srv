@@ -1,0 +1,12 @@
+# Request
+bool seed  # Whether to use a specific seed
+int64 seed_value  # Seed value if seed is true
+bool options  # Whether to use specific options
+string options_json  # JSON string of options if options is true
+---
+# Response
+Observation observation
+string[] info_keys
+string[] info_values
+bool success
+string message 

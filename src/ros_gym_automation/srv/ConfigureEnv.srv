@@ -1,0 +1,6 @@
+# Request
+string config_json  # Environment configuration as JSON string
+---
+# Response
+bool success
+string message 

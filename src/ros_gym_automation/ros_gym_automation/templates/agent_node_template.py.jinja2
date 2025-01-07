@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy
+from std_msgs.msg import Bool
+from {{ package_name }}.msg import Observation, Action, Reward, EnvStatus
+
+class {{ agent_name }}Node(Node):
+    def __init__(self):
+        super().__init__('{{ agent_name|lower }}_node')
+        
+        # QoS Profile for real-time performance
+        self.qos_profile = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.BEST_EFFORT
+        )
+        
+        # Publishers
+        self.action_pub = self.create_publisher(
+            Action,
+            '~/action',
+            self.qos_profile
+        )
+        
+        # Subscribers
+        self.obs_sub = self.create_subscription(
+            Observation,
+            '~/observation',
+            self.observation_callback,
+            self.qos_profile
+        )
+        self.reward_sub = self.create_subscription(
+            Reward,
+            '~/reward',
+            self.reward_callback,
+            self.qos_profile
+        )
+        self.done_sub = self.create_subscription(
+            Bool,
+            '~/done',
+            self.done_callback,
+            self.qos_profile
+        )
+        self.status_sub = self.create_subscription(
+            EnvStatus,
+            '~/status',
+            self.status_callback,
+            self.qos_profile
+        )
+        
+        # Initialize agent
+        self.model = self.load_model()
+        self.current_obs = None
+        self.episode_rewards = []
+        self.total_steps = 0
+        
+    def load_model(self):
+        """Load the agent's model.
+        
+        This method should be implemented based on the specific model type.
+        """
+        {{ model_loading_code }}
+        
+    def observation_callback(self, msg: Observation):
+        """Process new observation and generate action."""
+        self.current_obs = self.convert_from_ros_msg(msg)
+        
+        # Generate action using the model
+        action = self.model.predict(self.current_obs)
+        
+        # Convert and publish action
+        action_msg = self.convert_to_ros_msg(action)
+        self.action_pub.publish(action_msg)
+        
+    def reward_callback(self, msg: Reward):
+        """Process reward information."""
+        self.episode_rewards.append(msg.total_reward)
+        
+        # Log reward components if available
+        if msg.component_names:
+            for name, value in zip(msg.component_names, msg.component_values):
+                self.get_logger().debug(f'Reward component {name}: {value}')
+                
+    def done_callback(self, msg: Bool):
+        """Handle episode completion."""
+        if msg.data:
+            total_reward = sum(self.episode_rewards)
+            self.get_logger().info(f'Episode completed with total reward: {total_reward}')
+            self.episode_rewards = []
+            
+    def status_callback(self, msg: EnvStatus):
+        """Process environment status updates."""
+        self.total_steps = msg.total_steps
+        
+        # Log additional info if available
+        if msg.info_keys:
+            for key, value in zip(msg.info_keys, msg.info_values):
+                self.get_logger().debug(f'Status info {key}: {value}')
+                
+    def convert_from_ros_msg(self, msg: Observation) -> {{ observation_type }}:
+        """Convert ROS observation message to agent input format."""
+        {{ observation_conversion_code }}
+        
+    def convert_to_ros_msg(self, action: {{ action_type }}) -> Action:
+        """Convert agent action to ROS message format."""
+        {{ action_conversion_code }}
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = {{ agent_name }}Node()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main() 

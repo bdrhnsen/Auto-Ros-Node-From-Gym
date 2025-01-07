@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+from rclpy.lifecycle import Node as LifecycleNode, State, TransitionCallbackReturn
+from std_msgs.msg import Bool, Float32
+from {{ package_name }}.srv import ResetEnv, ConfigureEnv
+from {{ package_name }}.msg import *
+import json
+
+class {{ env_name }}Node(LifecycleNode):
+    def __init__(self):
+        super().__init__('{{ env_name|lower }}_node')
+        self.env = None
+        self.current_obs = None
+        self.episode_count = 0
+        self.total_steps = 0
+        
+        # Publishers
+        self.obs_pub = self.create_publisher(
+            {{ observation_msg_type }},
+            '~/observation',
+            10
+        )
+        self.reward_pub = self.create_publisher(Float32, '~/reward', 10)
+        self.done_pub = self.create_publisher(Bool, '~/done', 10)
+        self.status_pub = self.create_publisher(EnvStatus, '~/status', 10)
+        
+        # Subscribers
+        self.action_sub = self.create_subscription(
+            {{ action_msg_type }},
+            '~/action',
+            self.action_callback,
+            10
+        )
+        
+        # Services
+        self.reset_srv = self.create_service(
+            ResetEnv,
+            '~/reset',
+            self.reset_callback
+        )
+        self.configure_srv = self.create_service(
+            ConfigureEnv,
+            '~/configure',
+            self.configure_callback
+        )
+        
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
+        """Handle configuration of the node."""
+        try:
+            self.env = gym.make('{{ env_id }}')
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            self.get_logger().error(f'Failed to create environment: {e}')
+            return TransitionCallbackReturn.ERROR
+            
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
+        """Handle cleanup of the node."""
+        if self.env:
+            self.env.close()
+            self.env = None
+        return TransitionCallbackReturn.SUCCESS
+            
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        """Handle shutdown of the node."""
+        if self.env:
+            self.env.close()
+            self.env = None
+        return TransitionCallbackReturn.SUCCESS
+        
+    def action_callback(self, msg):
+        if not self.env:
+            self.get_logger().warn('Environment not initialized')
+            return
+            
+        action = self.convert_from_ros_msg(msg)
+        obs, reward, done, truncated, info = self.env.step(action)
+        self.total_steps += 1
+        
+        # Publish results
+        self.obs_pub.publish(self.convert_to_ros_msg(obs))
+        self.reward_pub.publish(Float32(data=reward))
+        self.done_pub.publish(Bool(data=done or truncated))
+        
+        # Publish status
+        status_msg = EnvStatus()
+        status_msg.done = done
+        status_msg.truncated = truncated
+        status_msg.episode_step = self.total_steps
+        status_msg.total_steps = self.total_steps
+        status_msg.total_reward = reward
+        if info:
+            status_msg.info_keys = list(info.keys())
+            status_msg.info_values = [str(v) for v in info.values()]
+        self.status_pub.publish(status_msg)
+        
+    def reset_callback(self, request, response):
+        if not self.env:
+            response.success = False
+            response.message = 'Environment not initialized'
+            return response
+            
+        kwargs = {}
+        if request.seed:
+            kwargs['seed'] = request.seed_value
+        if request.options:
+            try:
+                kwargs.update(json.loads(request.options_json))
+            except json.JSONDecodeError as e:
+                response.success = False
+                response.message = f'Invalid options JSON: {e}'
+                return response
+                
+        try:
+            obs, info = self.env.reset(**kwargs)
+            self.current_obs = obs
+            self.episode_count += 1
+            
+            response.observation = self.convert_to_ros_msg(obs)
+            if info:
+                response.info_keys = list(info.keys())
+                response.info_values = [str(v) for v in info.values()]
+            response.success = True
+            response.message = 'Environment reset successfully'
+        except Exception as e:
+            response.success = False
+            response.message = f'Reset failed: {e}'
+            
+        return response
+        
+    def configure_callback(self, request, response):
+        """Handle environment configuration updates."""
+        try:
+            config = json.loads(request.config_json)
+            if self.env:
+                self.env.close()
+            self.env = gym.make('{{ env_id }}', **config)
+            response.success = True
+            response.message = 'Environment configured successfully'
+        except json.JSONDecodeError as e:
+            response.success = False
+            response.message = f'Invalid configuration JSON: {e}'
+        except Exception as e:
+            response.success = False
+            response.message = f'Configuration failed: {e}'
+        return response
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = {{ env_name }}Node()
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(node)
+    try:
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main() 
