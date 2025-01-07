@@ -19,35 +19,35 @@ A framework for automatically generating ROS2 nodes from Gymnasium environments.
 - Gymnasium
 - numpy
 
-## Installation
+# Installation
 
-# Clone the repository
+## Clone the repository
 git clone https://github.com/bdrhnsen/Auto-Ros-Node-From-Gym.git
 cd ros-gym-automation
 
-# Create and activate virtual environment
+## Create and activate virtual environment
 python -m venv venv
 source venv/bin/activate
 
-# Install dependencies
+## Install dependencies
 pip install -r requirements.txt
 
-# Build ROS2 package
+## Build ROS2 package
 colcon build
 source install/setup.bash
 
-## Quick Start
+# Quick Start
 
-# Generate environment node
+## Generate environment node
 ros-gym-gen env CartPole-v1 my_workspace
 
-# Generate agent node
+## Generate agent node
 ros-gym-gen agent my_agent my_workspace --env-id=CartPole-v1
 
-# Launch nodes
+## Launch nodes
 ros2 launch my_package cartpole_v1_my_agent.launch.py
 
-## Project Structure
+# Project Structure
 
 ros_gym_automation/
 ├── docs/                    # Documentation
@@ -64,7 +64,7 @@ ros_gym_automation/
 │       └── templates/    # Jinja2 templates
 └── tests/                 # Test suite
 
-## Documentation
+# Documentation
 
 ### Core Components
 
@@ -94,30 +94,30 @@ ros_gym_automation/
 
 1. Basic Environment Node:
 
-   # Generate and run CartPole environment
+   #### Generate and run CartPole environment
    ros-gym-gen env CartPole-v1 my_workspace
    ros2 run my_package cartpole_v1_node
 
 2. Custom Configuration:
 
-   # Create config file
+   #### Create config file
    environment:
      render_mode: 'rgb_array'
      max_episode_steps: 1000
 
-   # Generate with config
+   #### Generate with config
    ros-gym-gen env CartPole-v1 my_workspace --config=config.yaml
 
 3. Agent Node:
 
-   # Generate agent node
+   #### Generate agent node
    ros-gym-gen agent my_agent my_workspace \
        --env-id=CartPole-v1 \
        --config=agent_config.yaml
 
 4. Launch File:
 
-   # Generate both nodes with launch file
+   ## Generate both nodes with launch file
    ros-gym-gen env CartPole-v1 my_workspace \
        --agent-name=my_agent \
        --agent-config=agent_config.yaml
@@ -142,12 +142,12 @@ ros_gym_automation/
    - QoS profiles
    - Namespace settings
 
-## Testing
+# Testing
 
-# Run all tests
+## Run all tests
 python -m pytest tests/
 
-# Run specific test suite
+## Run specific test suite
 python -m pytest tests/test_core_components.py
 python -m pytest tests/test_environment_types.py
 python -m pytest tests/test_integration.py
